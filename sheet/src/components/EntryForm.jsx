@@ -9,7 +9,7 @@ export default function EntryForm({ editing, onSaved, onCancelled }) {
     date: moment().format("YYYY-MM-DD"),
     route: "",
     km: "",
-    petrolFillDate: moment().format("YYYY-MM-DD"),
+    petrolFillDate: "",
     rupee: ""
   });
 
@@ -19,7 +19,7 @@ export default function EntryForm({ editing, onSaved, onCancelled }) {
         date: moment(editing.date).format("YYYY-MM-DD"),
         route: editing.route,
         km: editing.km,
-        petrolFillDate: moment(editing.petrolFillDate).format("YYYY-MM-DD"),
+        petrolFillDate: editing.petrolFillDate ? moment(editing.petrolFillDate).format("YYYY-MM-DD") : "",
         rupee: editing.rupee
       });
     }
@@ -30,11 +30,13 @@ export default function EntryForm({ editing, onSaved, onCancelled }) {
   const submit = async (e) => {
     e.preventDefault();
     try {
+      const payload = { ...form };
+      if (!payload.petrolFillDate) delete payload.petrolFillDate;
       if (editing) {
-        await API.put(`/entries/${editing._id}`, { ...form });
+        await API.put(`/entries/${editing._id}`, payload);
         toast.success("Entry updated");
       } else {
-        await API.post("/entries", { ...form });
+        await API.post("/entries", payload);
         toast.success("Entry added");
       }
       onSaved?.();
@@ -42,7 +44,7 @@ export default function EntryForm({ editing, onSaved, onCancelled }) {
         date: moment().format("YYYY-MM-DD"),
         route: "",
         km: "",
-        petrolFillDate: moment().format("YYYY-MM-DD"),
+        petrolFillDate: "",
         rupee: "",
       });
     } catch (error) {
@@ -162,7 +164,6 @@ export default function EntryForm({ editing, onSaved, onCancelled }) {
             onChange={handleChange}
             type="date"
             className="w-full px-4 py-3 border-2 border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
-            required
           />
         </div>
 

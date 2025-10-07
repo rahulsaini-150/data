@@ -5,7 +5,7 @@ const entrySchema = new mongoose.Schema({
   route: { type: String, required: true },
   km: { type: Number, required: true },
   rupee: { type: Number, required: true },
-  petrolFillDate: { type: Date, required: true }, // NEW FIELD
+  petrolFillDate: { type: Date, required: false }, // optional
   createdAt: { type: Date, default: Date.now }
 });
 

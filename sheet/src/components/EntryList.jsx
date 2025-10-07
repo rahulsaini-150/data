@@ -16,7 +16,7 @@ export default function EntryList({ onEdit, onDelete }) {
   const [search, setSearch] = useState("");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
-  const [sortBy, setSortBy] = useState("date");
+  const [sortBy, setSortBy] = useState("createdAt");
   const [sortDir, setSortDir] = useState("desc");
 
   const params = useMemo(() => ({ page, limit, search, fromDate, toDate, sortBy, sortDir }), [page, limit, search, fromDate, toDate, sortBy, sortDir]);
@@ -41,7 +41,7 @@ export default function EntryList({ onEdit, onDelete }) {
     setSearch("");
     setFromDate("");
     setToDate("");
-    setSortBy("date");
+    setSortBy("createdAt");
     setSortDir("desc");
     setLimit(10);
     setPage(1);
@@ -183,6 +183,13 @@ export default function EntryList({ onEdit, onDelete }) {
             <thead className="bg-gradient-to-r from-slate-100 to-blue-50 border-b-2 border-slate-200">
               <tr>
                 <th 
+                  className="px-6 py-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wider"
+                >
+                  <div className="flex items-center gap-2">
+                    S.No
+                  </div>
+                </th>
+                <th 
                   className="px-6 py-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wider cursor-pointer hover:bg-slate-200 transition-colors group"
                   onClick={()=>toggleSort("date")}
                 >
@@ -193,8 +200,16 @@ export default function EntryList({ onEdit, onDelete }) {
                     </svg>
                   </div>
                 </th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">
-                  Time
+                <th 
+                  className="px-6 py-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wider cursor-pointer hover:bg-slate-200 transition-colors group"
+                  onClick={()=>toggleSort("createdAt")}
+                >
+                  <div className="flex items-center gap-2">
+                    Time
+                    <svg className="w-4 h-4 text-slate-400 group-hover:text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                    </svg>
+                  </div>
                 </th>
                 <th 
                   className="px-6 py-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wider cursor-pointer hover:bg-slate-200 transition-colors group"
@@ -246,8 +261,11 @@ export default function EntryList({ onEdit, onDelete }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
-              {rows.map(e => (
+              {rows.map((e, idx) => (
                 <tr key={e._id} className="hover:bg-blue-50 transition-colors">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
+                    {(page - 1) * limit + idx + 1}
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">
                     {moment(e.date).format("DD MMM YYYY")}
                   </td>
@@ -261,7 +279,7 @@ export default function EntryList({ onEdit, onDelete }) {
                     {e.km}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
-                    {moment(e.petrolFillDate).format("DD MMM YYYY")}
+                    {e.petrolFillDate ? moment(e.petrolFillDate).format("DD MMM YYYY") : ""}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-green-600">
                     ₹{e.rupee}

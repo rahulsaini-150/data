@@ -6,7 +6,9 @@ import moment from "moment";
 export const createEntry = async (req, res) => {
   try {
     const { date, route, km, petrolFillDate, rupee } = req.body;
-    const entry = new Entry({ date, route, km, petrolFillDate, rupee });
+    const payload = { date, route, km, rupee };
+    if (petrolFillDate) payload.petrolFillDate = petrolFillDate;
+    const entry = new Entry(payload);
     await entry.save();
     res.status(201).json(entry);
   } catch (err) {
@@ -22,7 +24,7 @@ export const getEntries = async (req, res) => {
       search = "",
       fromDate,
       toDate,
-      sortBy = "date",
+      sortBy = "createdAt",
       sortDir = "desc",
     } = req.query;
 
@@ -104,7 +106,7 @@ export const deleteEntry = async (req, res) => {
 // Excel export
 export const exportExcel = async (req, res) => {
   try {
-    const { search = "", fromDate, toDate, sortBy = "date", sortDir = "desc" } = req.query;
+    const { search = "", fromDate, toDate, sortBy = "createdAt", sortDir = "desc" } = req.query;
     const filter = {};
     if (search) {
       filter.$or = [
@@ -123,6 +125,7 @@ export const exportExcel = async (req, res) => {
     const ws = wb.addWorksheet("Entries");
 
     ws.columns = [
+      { header: "S.No", key: "sno", width: 8 },
       { header: "Date", key: "date", width: 16 },
       { header: "Time", key: "time", width: 10 },
       { header: "Route", key: "route", width: 30 },
@@ -138,15 +141,16 @@ export const exportExcel = async (req, res) => {
 
     let totalKm = 0;
     let totalRupee = 0;
-    entries.forEach(e => {
+    entries.forEach((e, i) => {
       totalKm += Number(e.km) || 0;
       totalRupee += Number(e.rupee) || 0;
       ws.addRow({
+        sno: i + 1,
         date: moment(e.date).format("DD MMM YYYY"),
         time: moment(e.createdAt).format("hh:mm A"),
         route: e.route,
         km: e.km,
-        petrolFillDate: moment(e.petrolFillDate).format("DD MMM YYYY"),
+        petrolFillDate: e.petrolFillDate ? moment(e.petrolFillDate).format("DD MMM YYYY") : "",
         rupee: e.rupee
       });
     });
@@ -178,7 +182,22 @@ export const exportExcel = async (req, res) => {
 // PDF export
 export const exportPDF = async (req, res) => {
   try {
-    const entries = await Entry.find().sort({ date: -1 });
+    const { search = "", fromDate, toDate, sortBy = "createdAt", sortDir = "desc" } = req.query;
+
+    const filter = {};
+    if (search) {
+      filter.$or = [
+        { route: { $regex: new RegExp(search, "i") } },
+      ];
+    }
+    if (fromDate || toDate) {
+      filter.date = {};
+      if (fromDate) filter.date.$gte = new Date(fromDate);
+      if (toDate) filter.date.$lte = new Date(toDate);
+    }
+
+    const sort = { [sortBy]: sortDir === "asc" ? 1 : -1 };
+    const entries = await Entry.find(filter).sort(sort);
 
     const doc = new PDFDocument({ margin: 30, size: "A4" });
 
@@ -194,35 +213,61 @@ export const exportPDF = async (req, res) => {
 
     // Table header
     const tableTop = 80;
-    const itemSpacing = 20;
     let y = tableTop;
 
-    const headers = ["Date", "Route", "KM", "Petrol Date", "Rupee"];
-    const columnPositions = [30, 120, 300, 380, 470];
+    const headers = ["S.No", "Date", "Route", "KM", "Petrol Date", "Rupee"];
+    const columnPositions = [30, 70, 150, 370, 430, 510];
+    const columnWidths =     [30,  80,  200,  50,   70,   60];
 
     doc.fontSize(12).fillColor("black").font("Helvetica-Bold");
-    headers.forEach((header, i) => doc.text(header, columnPositions[i], y));
-    y += 15;
+    headers.forEach((header, i) => {
+      doc.text(header, columnPositions[i], y, { width: columnWidths[i] });
+    });
+    y += 18;
 
     // Draw a line below header
-    doc.moveTo(30, y).lineTo(550, y).stroke();
-    y += 5;
+    doc.moveTo(30, y).lineTo(570, y).stroke();
+    y += 6;
 
-    // Table rows
-    doc.font("Helvetica").fontSize(10);
-    entries.forEach((e) => {
-      doc.text(moment(e.date).format("YYYY-MM-DD"), columnPositions[0], y);
-      doc.text(e.route, columnPositions[1], y, { width: 160 });
-      doc.text(String(e.km), columnPositions[2], y);
-      doc.text(moment(e.petrolFillDate).format("YYYY-MM-DD"), columnPositions[3], y);
-      doc.text(String(e.rupee), columnPositions[4], y);
-      y += itemSpacing;
+    // Table rows with wrapping and dynamic height
+    doc.font("Helvetica").fontSize(10).fillColor("black");
+    const bottomLimit = 760;
+    entries.forEach((e, i) => {
+      const cells = [
+        String(i + 1),
+        moment(e.date).format("YYYY-MM-DD"),
+        e.route || "",
+        String(e.km ?? ""),
+        e.petrolFillDate ? moment(e.petrolFillDate).format("YYYY-MM-DD") : "",
+        String(e.rupee ?? ""),
+      ];
 
-      // Add new page if near bottom
-      if (y > 720) {
+      // Compute row height based on wrapped text
+      const heights = cells.map((text, idx) => doc.heightOfString(text, { width: columnWidths[idx] }));
+      const rowHeight = Math.max(...heights, 14) + 6; // add small padding
+
+      // Page break if needed
+      if (y + rowHeight > bottomLimit) {
         doc.addPage();
         y = tableTop;
+        // redraw header on new page
+        doc.fontSize(12).font("Helvetica-Bold");
+        headers.forEach((header, idx) => {
+          doc.text(header, columnPositions[idx], y, { width: columnWidths[idx] });
+        });
+        y += 18;
+        doc.moveTo(30, y).lineTo(570, y).stroke();
+        y += 6;
+        doc.font("Helvetica").fontSize(10);
       }
+
+      // Render row
+      cells.forEach((text, idx) => {
+        const align = (idx === 0 || idx === 3 || idx === 5) ? "right" : "left";
+        doc.text(text, columnPositions[idx], y, { width: columnWidths[idx], align });
+      });
+
+      y += rowHeight;
     });
 
     // Draw border around table (optional)
